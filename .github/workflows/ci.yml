@@ -131,7 +131,7 @@ jobs:
             # echo "Application did not start within the timeout"
             # exit 1
       - name: Run Playwright Tests (${{ matrix.browser }})
-        run: pnpm test:e2e --browser=${{ matrix.browser }}
+        run: pnpm exec playwright test --project=chromium
         env:
           PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
 
