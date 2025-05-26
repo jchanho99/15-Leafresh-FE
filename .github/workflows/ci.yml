@@ -108,8 +108,8 @@ jobs:
         run: echo "Using cached pnpm modules"
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-      - name: Install Playwright
-        run: pnpm add -D playwright
+      # - name: Install Playwright
+      #   run: pnpm add -D playwright
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Build Next.js app for testing
