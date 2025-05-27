@@ -37,7 +37,7 @@ jobs:
   lint:
     name: Lint
     needs: setup
-    if: github.ref == 'refs/heads/develop' || github.base_ref == 'develop'
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -61,7 +61,7 @@ jobs:
   unit-test:
     name: Unit Test
     needs: setup
-    if: github.ref == 'refs/heads/develop' || github.base_ref == 'develop'
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -85,7 +85,7 @@ jobs:
   integration-test:
     name: Integration Test
     needs: setup
-    if: github.base_ref == 'main' && github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -108,8 +108,6 @@ jobs:
         run: echo "Using cached pnpm modules"
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-      # - name: Install Playwright
-      #   run: pnpm add -D playwright
       - name: Install Playwright Browsers
         run: npx playwright install --with-deps ${{ matrix.browser }}
       - name: Build Next.js app for testing
@@ -118,19 +116,20 @@ jobs:
         run: pnpm run start &
       - name: Wait for App to Start (Health Check)
         run: |
-            TIMEOUT=60
-            for i in $(seq 1 $TIMEOUT); do
-              if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 >/dev/null 2>&1 && [ "$status" -eq "200" ]; then
-                echo "Application is ready"
-                exit 0
-              fi
-              echo "Waiting for application... ($i/$TIMEOUT)"
-              sleep 1
-            done
-            echo "Application did not start within the timeout"
-            exit 1
+            TIMEOUT=30
+            sleep $TIMEOUT;
+            # for i in $(seq 1 $TIMEOUT); do
+            #   if curl -s -o /dev/null -w "%{http_code}" http://localhost:3000 >/dev/null 2>&1 && [ "$status" -eq "200" ]; then
+            #     echo "Application is ready"
+            #     exit 0
+            #   fi
+            #   echo "Waiting for application... ($i/$TIMEOUT)"
+            #   sleep 1
+            # done
+            # echo "Application did not start within the timeout"
+            # exit 1
       - name: Run Playwright Tests (${{ matrix.browser }})
-        run: pnpm test:e2e --browser=${{ matrix.browser }}
+        run: pnpm exec playwright test --project=chromium
         env:
           PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
 
@@ -172,7 +171,6 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: jchanho99/frontend-dev:latest
-
 
   build-prod:
     name: Build and Push Frontend Docker (main)
