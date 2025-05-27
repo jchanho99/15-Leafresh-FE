@@ -41,13 +41,3 @@ EXPOSE 3000
 
 # Command to run the Next.js application
 CMD ["pnpm", "run", "start"]
-
-# Optional: If using Next.js standalone output, uncomment the following line
-# CMD ["node", "server.js"]
-
-# Optional: Add a healthcheck (adjust the URL if needed)
-# HEALTHCHECK --interval=5m --timeout=3s CMD curl -f http://localhost:3000 || exit 1
-
-# Optional: If you need specific packages for Alpine (e.g., for image processing like sharp)
-# RUN apk add --no-cache vips-dev
-# RUN npm install --no-optional sharp
