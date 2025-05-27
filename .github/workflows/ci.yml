@@ -134,7 +134,7 @@ jobs:
           PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
 
   build-dev:
-    name: Build and Push Frontend Docker (develop)
+    name: Build and Push Docker (dev)
     needs: [lint, unit-test]
     if: github.base_ref == 'develop' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -167,7 +167,7 @@ jobs:
           tags: jchanho99/frontend-dev:latest
 
   build-prod:
-    name: Build and Push Frontend Docker (main)
+    name: Build and Push Docker (prod)
     needs: [integration-test]
     if: github.base_ref == 'main' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
