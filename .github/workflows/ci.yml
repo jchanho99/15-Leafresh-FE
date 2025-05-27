@@ -140,30 +140,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '22'
           cache: 'pnpm'
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Build App
         run: pnpm run build
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
-
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
@@ -179,30 +173,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '22'
           cache: 'pnpm'
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-
       - name: Build App
         run: pnpm run build
-
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
-
       - name: Build and Push Docker Image
         uses: docker/build-push-action@v5
         with:
