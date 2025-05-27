@@ -32,7 +32,7 @@ RUN npm install -g pnpm && pnpm install --prod --frozen-lockfile
 # 빌드된 정적 파일만 복사
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/next.config.js ./
+COPY --from=builder /app/next.config.ts ./
 
 USER nodejs
 
