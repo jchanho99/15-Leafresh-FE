@@ -174,7 +174,7 @@ jobs:
 
   build-prod:
     name: Build and Push Frontend Docker (main)
-    needs: [lint, unit-test]
+    needs: [integration-test]
     if: github.base_ref == 'main' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
