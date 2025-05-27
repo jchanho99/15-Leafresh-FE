@@ -134,38 +134,24 @@ jobs:
           PLAYWRIGHT_TEST_BASE_URL: http://localhost:3000
 
   build-dev:
-    name: Build Frontend Docker (develop only)
+    name: Build and Push Docker (dev)
     needs: [lint, unit-test]
-    if: github.ref == 'refs/heads/develop' || github.base_ref == 'develop'
+    if: github.base_ref == 'develop' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./
     steps:
       - uses: actions/checkout@v3
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '22'
-      - name: Use cached pnpm modules
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-      - name: Get pnpm cache directory
-        shell: bash
-        id: pnpm-cache
-        run: |
-          echo "pnpm_cache_path=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
-        name: Cache pnpm modules
-        with:
-          path: ${{ steps.pnpm-cache.outputs.pnpm_cache_path }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('./pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
+          cache: 'pnpm'
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
-      - name: Build Next.js App
+      - name: Build App
         run: pnpm run build
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -179,42 +165,26 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: jchanho99/frontend-dev:latest
-          # cache-from: type=gha,scope=build-frontend-dev
-          # cache-to: type=gha,mode=max,scope=build-frontend-dev
 
   build-prod:
-    name: Build Frontend Docker (main only PR)
-    needs: integration-test
+    name: Build and Push Docker (prod)
+    needs: [integration-test]
     if: github.base_ref == 'main' && github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./
     steps:
       - uses: actions/checkout@v3
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: latest
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '22'
-      - name: Use cached pnpm modules
-        uses: pnpm/action-setup@v2
-        with:
-          version: latest
-      - name: Get pnpm cache directory
-        shell: bash
-        id: pnpm-cache
-        run: |
-          echo "pnpm_cache_path=$(pnpm store path --silent)" >> $GITHUB_OUTPUT
-      - uses: actions/cache@v3
-        name: Cache pnpm modules
-        with:
-          path: ${{ steps.pnpm-cache.outputs.pnpm_cache_path }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('./pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-
+          cache: 'pnpm'
       - name: Install Dependencies
-        run: pnpm install  --frozen-lockfile
-      - name: Build Next.js App
+        run: pnpm install --frozen-lockfile
+      - name: Build App
         run: pnpm run build
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -228,6 +198,3 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: jchanho99/frontend-prod:latest
-          # cache-from: type=gha,scope=build-frontend-prod
-          # cache-to: type=gha,mode=max,scope=build-frontend-prod
-

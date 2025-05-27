@@ -1,43 +1,41 @@
-# Stage 1: Build the Next.js application
+# Stage 1: Build the Next.js application using a lightweight builder
 FROM node:22-alpine AS builder
+
 WORKDIR /app
 
-# Copy package.json and pnpm-lock.yaml to install dependencies
-COPY package*.json pnpm-lock.yaml ./
-
-# Install pnpm globally and then install project dependencies
+# Install pnpm first (전역)
 RUN npm install -g pnpm
+
+# 복사 및 의존성 설치
+COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 
-# Copy the rest of the application code
+# 나머지 코드 복사 및 빌드
 COPY . .
-
-# Build the Next.js application
 RUN pnpm run build
 
-
-# Stage 2: Create the production-ready image
+# Stage 2: Use a minimal production image (only what's needed to serve)
 FROM node:22-alpine AS runner
+
 WORKDIR /app
 
-# Set environment to production
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
-# Create a non-root user for security
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nodejs
+# Non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nodejs
 
-# Copy necessary files from the builder stage
-COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/package*.json ./
+# Install only production dependencies
+COPY package.json pnpm-lock.yaml ./
+RUN npm install -g pnpm && pnpm install --prod --frozen-lockfile
+
+# 빌드된 정적 파일만 복사
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/next.config.ts ./
 
-# Switch to the non-root user
 USER nodejs
 
-# Expose the port Next.js runs on
 EXPOSE 3000
 
-# Command to run the Next.js application
 CMD ["pnpm", "run", "start"]
