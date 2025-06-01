@@ -65,7 +65,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Create non-root user
-RUN addgroup -g 1001 nodejs && adduser -u 1001 -G nodejs -s /bin/sh -D nodejs
+RUN addgroup -g 1001 nodejs && adduser -u 1001 -G nodejs -s /bin/sh -D nodejs && \
+    npm install -g pnpm
 
 # Copy only what is needed to run
 COPY --from=builder /app/.next ./.next
