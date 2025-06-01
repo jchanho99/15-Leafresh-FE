@@ -165,7 +165,7 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: jchanho99/frontend-dev:latest
+          tags: jchanho99/frontend-develop:latest
 
   build-prod:
     name: Build and Push Docker (prod)
@@ -187,3 +187,131 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: jchanho99/frontend-prod:latest
+
+  deploy-dev:
+    name: Deploy to Dev Server
+    if: github.base_ref == 'develop'
+    needs: [build-dev]
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.set-status.outputs.status }}
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.FE_SSH_PRIVATE_KEY }}
+
+      - name: Deploy to Dev
+        id: deploy-step
+        run: |
+          HOST="${{ secrets.FE_DEV_HOST }}"
+          IMAGE="jchanho99/frontend-develop:latest"
+
+          ssh $HOST << EOF
+            set -e
+            echo "Pulling Docker image: $IMAGE"
+            cd /opt/frontend/
+
+            sudo docker pull $IMAGE
+            sudo docker compose down
+            sudo docker rm frontend-develop || true
+            sudo docker compose up -d
+EOF
+
+      - name: Set Status (Dev)
+        id: set-status
+        if: success()
+        run: echo "status=success" >> "$GITHUB_OUTPUT"
+
+      - name: Set Status (Dev Failure)
+        if: failure()
+        run: echo "status=failure" >> "$GITHUB_OUTPUT"
+
+  deploy-prod:
+    name: Deploy to Prod Server (Blue-Green)
+    if: github.base_ref == 'main'
+    needs: [build-prod]
+    runs-on: ubuntu-latest
+    outputs:
+      status: ${{ steps.set-status.outputs.status }}
+    steps:
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.FE_SSH_PRIVATE_KEY }}
+
+      - name: Deploy to Prod
+        id: deploy-step
+        run: |
+          HOST="${{ secrets.FE_PROD_HOST }}"
+          IMAGE="jchanho99/frontend-prod:latest"
+
+          ssh $HOST << EOF
+            set -e
+            echo "Pulling Docker image: $IMAGE"
+            cd /opt/frontend/
+            sudo docker pull $IMAGE
+
+            CURRENT=\$(cat /opt/frontend-current 2>/dev/null || echo blue)
+            NEXT=\$( [ "\$CURRENT" = "blue" ] && echo green || echo blue )
+
+            echo "Current: \$CURRENT, Next: \$NEXT"
+
+            sudo docker compose up -d
+
+            for i in {1..60}; do
+              STATUS=\$(curl -s http://localhost:3001 | grep "<title>")
+              [ ! -z "\$STATUS" ] && echo "✅ Health check passed" && break
+              echo "Waiting (\$i)..."
+              sleep 1
+            done
+
+            if [ -z "\$STATUS" ]; then
+              echo "❌ Health check failed"
+              sudo docker stop frontend-\$NEXT || true
+              sudo docker rm frontend-\$NEXT || true
+              exit 1
+            fi
+
+            sudo docker stop frontend-\$CURRENT || true
+            sudo docker rm frontend-\$CURRENT || true
+            sudo docker stop frontend-\$NEXT || true
+            sudo docker rm frontend-\$NEXT || true
+
+            sudo docker compose up -d
+
+            echo "\$NEXT" > /opt/frontend-current
+            echo "✅ Blue-Green 배포 완료"
+EOF
+
+      - name: Set Status (Prod)
+        id: set-status
+        if: success()
+        run: echo "status=success" >> "$GITHUB_OUTPUT"
+
+      - name: Set Status (Prod Failure)
+        if: failure()
+        run: echo "status=failure" >> "$GITHUB_OUTPUT"
+
+  notify:
+    name: Discord Notification
+    needs: cd
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord Message
+        run: |
+          STATUS="${{ needs.cd.outputs.status }}"
+          ENV="${{ github.base_ref == 'main' && 'prod' || 'develop' }}"
+          if [ "$STATUS" = "success" ]; then
+            MESSAGE="✅ \`[FE $ENV]\` 배포 완료 — DockerHub 이미지 및 헬스체크 성공"
+          elif [ "$STATUS" = "failure" ]; then
+            MESSAGE="🚨 \`[FE $ENV]\` 배포 실패 — 이미지 pull 또는 헬스체크 실패"
+          else
+            MESSAGE="⚠️ \`[FE $ENV]\` 배포 상태: $STATUS"
+          fi
+
+          curl -H "Content-Type: application/json" \
+               -X POST \
+               -d "{\"content\": \"$MESSAGE\"}" \
+               ${{ secrets.DISCORD_WEBHOOK_URL }}
