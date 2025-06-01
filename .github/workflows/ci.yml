@@ -295,7 +295,7 @@ jobs:
 
   notify:
     name: Discord Notification
-    needs: cd
+    # needs: cd
     if: always()
     runs-on: ubuntu-latest
     steps:
