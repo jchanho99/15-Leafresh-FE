@@ -112,8 +112,8 @@ jobs:
   build:
     name: Build & Push Docker Image
     if: |
-      (github.ref_name == 'develop' && needs.lint-and-unit-test.result == 'success') ||
-      (github.ref_name == 'main' && needs.integration-test.result == 'success')
+      (github.base_ref == 'develop' && needs.lint-and-unit-test.result == 'success') ||
+      (github.base_ref == 'main' && needs.integration-test.result == 'success')
     needs: [lint-and-unit-test, integration-test]
     runs-on: ubuntu-latest
 
