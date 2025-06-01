@@ -199,12 +199,12 @@ jobs:
       - name: Setup SSH
         uses: webfactory/ssh-agent@v0.7.0
         with:
-          ssh-private-key: ${{ secrets.FE_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.LEAFRESH_DEV_SSH }}
 
       - name: Deploy to Dev
         id: deploy-step
         run: |
-          HOST="${{ secrets.FE_DEV_HOST }}"
+          HOST="${{ secrets.LEAFRESH_DEV_HOST }}"
           IMAGE="jchanho99/frontend-develop:latest"
 
           ssh $HOST << EOF
@@ -212,11 +212,11 @@ jobs:
             echo "Pulling Docker image: $IMAGE"
             cd /opt/frontend/
 
-            sudo docker pull $IMAGE
+            # sudo docker pull $IMAGE
             sudo docker compose down
             sudo docker rm frontend-develop || true
             sudo docker compose up -d
-EOF
+          EOF
 
       - name: Set Status (Dev)
         id: set-status
@@ -243,7 +243,7 @@ EOF
       - name: Deploy to Prod
         id: deploy-step
         run: |
-          HOST="${{ secrets.FE_PROD_HOST }}"
+          HOST="${{ secrets.LEAFRESH_PROD_HOST }}"
           IMAGE="jchanho99/frontend-prod:latest"
 
           ssh $HOST << EOF
@@ -282,7 +282,7 @@ EOF
 
             echo "\$NEXT" > /opt/frontend-current
             echo "✅ Blue-Green 배포 완료"
-EOF
+          EOF
 
       - name: Set Status (Prod)
         id: set-status
