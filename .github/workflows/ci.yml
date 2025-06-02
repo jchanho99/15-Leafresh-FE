@@ -257,7 +257,7 @@ jobs:
           port: ${{ secrets.LEAFRESH_PROD_SSH_PORT || 22 }} # 프로덕션 서버 SSH 포트 Secret (없으면 22)
           script: |
             set -e # 오류 발생 시 즉시 스크립트 중단
-            IMAGE="jchanho99/frontend-prod:${{ github.sha.substring(0, 7) }}"
+            IMAGE="jchanho99/frontend-prod:${{ env.SHORT_SHA }}"
             HEALTH_CHECK_URL="http://localhost:3001" # 헬스 체크 URL
 
             echo "🚀 Starting Prod Blue-Green Deployment to host: ${{ secrets.LEAFRESH_PROD_HOST }}"
