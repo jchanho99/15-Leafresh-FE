@@ -192,7 +192,8 @@ jobs:
 
   deploy-dev:
     name: Deploy to Dev Server
-    if: github.event.pull_request.merged == true && github.base_ref == 'develop' # PR이 develop에 merge되었을 때 실행
+    # if: github.event.pull_request.merged == true && github.base_ref == 'develop' # PR이 develop에 merge되었을 때 실행
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
     needs: [build-dev]
     runs-on: ubuntu-latest
     outputs:
@@ -241,7 +242,8 @@ jobs:
 
   deploy-prod:
     name: Deploy to Prod Server (Blue-Green)
-    if: github.event.pull_request.merged == true && github.base_ref == 'main' # PR이 main에 merge되었을 때 실행
+    # if: github.event.pull_request.merged == true && github.base_ref == 'main' # PR이 main에 merge되었을 때 실행
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
     needs: [build-prod]
     runs-on: ubuntu-latest
     outputs:
