@@ -12,126 +12,185 @@ on:
           - prod
 
 jobs:
-  deploy:
-    name: FE Docker 배포
+  deploy-dev:
+    name: Deploy to Dev Server
+    # if: github.event.pull_request.merged == true && github.base_ref == 'develop' # PR이 develop에 merge되었을 때 실행
+    if: github.event_name == 'pull_request' && github.base_ref == 'develop'
+    needs: [build-dev]
     runs-on: ubuntu-latest
     outputs:
       status: ${{ steps.set-status.outputs.status }}
-
     steps:
-      - name: SSH 키 설정
-        uses: webfactory/ssh-agent@v0.7.0
-        with:
-          ssh-private-key: ${{ secrets.FE_SSH_PRIVATE_KEY }}
-
-      - name: DockerHub 이미지 실행
+      - name: Deploy to Dev
         id: deploy-step
-        run: |
-          set -e
-          ENV="${{ github.event.inputs.env }}"
-          HOST="${{ secrets.FE_DEV_HOST }}"
-          if [ "$ENV" = "prod" ]; then
-            HOST="${{ secrets.FE_PROD_HOST }}"
-          fi
-
-          IMAGE_NAME="frontend:${ENV}"
-          FULL_IMAGE="${{ secrets.DOCKERHUB_USERNAME }}/$IMAGE_NAME"
-
-          echo "배포 환경: $ENV"
-          echo "배포 서버: $HOST"
-          echo "Docker 이미지: $FULL_IMAGE"
-
-          ssh $HOST << EOF
-            set -e
-            echo "Docker 이미지 pull 중"
-            docker pull $FULL_IMAGE
-
-            if [ "$ENV" = "develop" ]; then
-              echo "개발 환경 배포 중"
-              docker stop frontend || true
-              docker rm frontend || true
-              docker run -d --name frontend -p 3000:3000 \
-                -e NODE_ENV=development \
-                --restart always \
-                $FULL_IMAGE
-            else
-              echo "운영 환경 Blue-Green 배포 시작"
-
-              CURRENT=\$(cat /opt/frontend-current 2>/dev/null || echo blue)
-              NEXT=\$( [ "\$CURRENT" = "blue" ] && echo green || echo blue )
-
-              echo "현재 컨테이너: frontend-\$CURRENT"
-              echo "새 컨테이너: frontend-\$NEXT"
-
-              docker run -d --name frontend-\$NEXT -p 3001:3000 \
-                -e NODE_ENV=production \
-                --restart always \
-                $FULL_IMAGE
-
-              echo "헬스체크 시작 (최대 60초 대기)"
-              for i in {1..60}; do
-                STATUS=\$(curl -s http://localhost:3001 | grep "<title>")
-                if [ ! -z "\$STATUS" ]; then
-                  echo "✅ 헬스체크 성공"
-                  break
-                fi
-                echo "대기 중(\$i)"
-                sleep 1
-              done
-
-              if [ -z "\$STATUS" ]; then
-                echo "❌ 헬스체크 실패"
-                docker stop frontend-\$NEXT || true
-                docker rm frontend-\$NEXT || true
-                exit 1
-              fi
-
-              echo "기존 컨테이너 제거"
-              docker stop frontend-\$CURRENT || true
-              docker rm frontend-\$CURRENT || true
-
-              echo "새 컨테이너 3000 포트로 재시작"
-              docker stop frontend-\$NEXT || true
-              docker rm frontend-\$NEXT || true
-              docker run -d --name frontend-\$NEXT -p 3000:3000 \
-                -e NODE_ENV=production \
-                --restart always \
-                $FULL_IMAGE
-
-              echo "\$NEXT" > /opt/frontend-current
-
-              echo "Blue-Green 배포 완료: frontend-\$NEXT → port 3000"
-            fi
-          EOF
-
-      - name: 상태 출력
+        uses: appleboy/ssh-action@v1.0.3 # 특정 버전 사용 권장
+        with:
+          host: ${{ secrets.LEAFRESH_DEV_HOST }}
+          username: ${{ secrets.LEAFRESH_DEV_SSH_USER }} # 개발 서버 SSH 사용자 이름 Secret
+          key: ${{ secrets.LEAFRESH_DEV_SSH }}
+          port: ${{ secrets.LEAFRESH_DEV_SSH_PORT || 22 }} # 개발 서버 SSH 포트 Secret (없으면 22)
+          script: |
+            set -e # 오류 발생 시 즉시 스크립트 중단
+            IMAGE="jchanho99/frontend-develop:latest"
+            cd /opt/frontend/
+            echo "PWD: $(pwd)"
+            sudo docker compose down
+            sudo docker rm frontend-develop || true # frontend-develop 컨테이너 삭제 (오류 무시)
+            sudo docker compose up -d
+            
+      - name: Set Status (Dev)
         id: set-status
-        run: echo "status=success" >> "$GITHUB_OUTPUT"
         if: success()
+        run: echo "status=success" >> "$GITHUB_OUTPUT"
 
-      - name: 실패 상태 출력
-        id: set-status
-        if: failure()
+      - name: Set Status (Dev Failure)
+        if: failure() && steps.deploy-step.outcome == 'failure' # deploy-step이 실패했을 때만
         run: echo "status=failure" >> "$GITHUB_OUTPUT"
 
-  notify:
-    name: Discord 알림
+  deploy-prod:
+    name: Deploy to Prod Server (Blue-Green)
+    # if: github.event.pull_request.merged == true && github.base_ref == 'main' # PR이 main에 merge되었을 때 실행
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    needs: [build-prod]
     runs-on: ubuntu-latest
-    needs: deploy
-    if: always()
-
+    outputs:
+      status: ${{ steps.set-status.outputs.status }}
     steps:
-      - name: 디스코드 알림 전송
-        run: |
-          STATUS="${{ needs.deploy.outputs.status }}"
-          ENV="${{ github.event.inputs.env }}"
+      - name: Deploy to Prod
+        id: deploy-step
+        uses: appleboy/ssh-action@v1.0.3 # 특정 버전 사용 권장
+        with:
+          host: ${{ secrets.LEAFRESH_PROD_HOST }}
+          username: ${{ secrets.LEAFRESH_PROD_SSH_USER }} # 프로덕션 서버 SSH 사용자 이름 Secret
+          key: ${{ secrets.FE_SSH_PRIVATE_KEY }}
+          port: ${{ secrets.LEAFRESH_PROD_SSH_PORT || 22 }} # 프로덕션 서버 SSH 포트 Secret (없으면 22)
+          script: |
+            set -e # 오류 발생 시 즉시 스크립트 중단
+            IMAGE="jchanho99/frontend-prod:${{ env.SHORT_SHA }}"
+            HEALTH_CHECK_URL="http://localhost:3001" # 헬스 체크 URL
 
-          if [ "$STATUS" = "success" ]; then
-            MESSAGE="✅ \`[FE $ENV]\` 배포 완료 — DockerHub 이미지 pull 및 헬스체크 성공"
-          elif [ "$STATUS" = "failure" ]; then
-            MESSAGE="🚨 \`[FE $ENV]\` 배포 실패 — 이미지 pull 또는 헬스체크 오류 발생"
-          else
-            MESSAGE="⚠️ \`[FE $ENV]\` 배포 상태: $STATUS"
+            echo "🚀 Starting Prod Blue-Green Deployment to host: ${{ secrets.LEAFRESH_PROD_HOST }}"
+            echo "🖼️ Using image: $IMAGE"
+
+            cd /opt/frontend/
+            echo "PWD: $(pwd)"
+
+            echo "🚚 Pulling Docker image: $IMAGE"
+            sudo docker pull "$IMAGE"
+
+            CURRENT=$(cat /opt/frontend-current 2>/dev/null || echo blue)
+            NEXT=$([ "$CURRENT" = "blue" ] && echo green || echo blue)
+
+            echo "🔵 Current active environment: $CURRENT"
+            echo "🟢 Next environment to deploy: $NEXT"
+            
+            # 참고: 아래 docker compose up -d 명령은 /opt/frontend/docker-compose.yml 파일을 사용합니다.
+            # 이 docker-compose.yml 파일이 $NEXT 환경 (예: frontend-green 서비스)을 
+            # 올바르게 시작하거나 업데이트하도록 구성되어 있어야 합니다.
+            # (예: docker-compose.yml 내부에 blue, green 서비스가 모두 정의되어 있거나, 
+            # 환경변수를 통해 타겟 서비스의 이미지가 동적으로 설정되는 등)
+            echo "🚀 Bringing up $NEXT environment (frontend-$NEXT)..."
+            # 만약 docker-compose.yml에서 $NEXT에 해당하는 특정 서비스를 지정해야 한다면,
+            # 예: sudo docker compose up -d service-$NEXT
+            # 현재는 전체 compose up을 수행합니다.
+            sudo docker compose up -d # 이 명령이 frontend-$NEXT 컨테이너를 시작/업데이트해야 함
+
+            echo "🩺 Performing health check for $NEXT on $HEALTH_CHECK_URL..."
+            HEALTH_CHECK_PASSED=false
+            for i in {1..60}; do
+              # 포트 리스닝 확인 (nc 명령어가 서버에 설치되어 있어야 함)
+              if nc -z localhost 3001 2>/dev/null; then
+                HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_CHECK_URL")
+                if [ "$HTTP_CODE" -eq 200 ]; then
+                  # 원본 스크립트의 <title> 태그 확인 로직
+                  CONTENT_STATUS=$(curl -s "$HEALTH_CHECK_URL" | grep "<title>")
+                  if [ ! -z "$CONTENT_STATUS" ]; then
+                    echo "✅ Health check passed for $NEXT on attempt $i (HTTP $HTTP_CODE with <title>)."
+                    HEALTH_CHECK_PASSED=true
+                    break
+                  else
+                    echo "⏳ Waiting ($i)... Health check for $NEXT: HTTP $HTTP_CODE but <title> not found. Retrying..."
+                  fi
+                else
+                  echo "⏳ Waiting ($i)... Health check for $NEXT: Failed with HTTP status $HTTP_CODE. Retrying..."
+                fi
+              else
+                echo "⏳ Waiting ($i)... Health check for $NEXT: Port 3001 not listening. Retrying..."
+              fi
+              sleep 1
+            done
+
+            if [ "$HEALTH_CHECK_PASSED" != "true" ]; then
+              echo "❌ Health check failed for $NEXT environment after 60 attempts."
+              echo "💣 Rolling back: Attempting to stop and remove $NEXT environment (frontend-$NEXT)..."
+              sudo docker stop "frontend-$NEXT" || true
+              sudo docker rm "frontend-$NEXT" || true
+              # 필요시 이전 $CURRENT 환경을 명시적으로 다시 활성화하는 로직 추가 가능
+              exit 1
+            fi
+
+            echo "✅ Health check successful for $NEXT environment."
+            echo "🔄 Switching traffic..."
+
+            echo "🛑 Stopping and removing $CURRENT environment (frontend-$CURRENT)..."
+            sudo docker stop "frontend-$CURRENT" || true
+            sudo docker rm "frontend-$CURRENT" || true
+            
+            # --- 원본 스크립트의 로직 유지 ---
+            # 성공적으로 헬스체크된 $NEXT 환경을 중지, 삭제 후 다시 docker compose up 하는 부분입니다.
+            # 특정 이유가 있을 수 있으므로 원본 로직을 유지합니다.
+            # 일반적인 Blue/Green에서는 이 부분이 필요 없을 수 있습니다 (이미 $NEXT는 잘 실행 중).
+            # 대신, 이 시점에서 리버스 프록시 설정을 변경하여 트래픽을 $NEXT로 전환합니다.
+            echo "⚠️ Force restarting $NEXT environment as per original script logic (stop, rm, up)..."
+            sudo docker stop "frontend-$NEXT" || true
+            sudo docker rm "frontend-$NEXT" || true
+            sudo docker compose up -d # $NEXT 환경을 다시 시작
+            # --- 원본 스크립트 로직 끝 ---
+
+            echo "$NEXT" > /opt/frontend-current
+            echo "🎉 Prod Blue-Green deployment to $NEXT complete. $NEXT is now active."
+
+      - name: Set Status (Prod)
+        id: set-status
+        if: success()
+        run: echo "status=success" >> "$GITHUB_OUTPUT"
+
+      - name: Set Status (Prod Failure)
+        if: failure() && steps.deploy-step.outcome == 'failure' # deploy-step이 실패했을 때만
+        run: echo "status=failure" >> "$GITHUB_OUTPUT"
+  
+  notify:
+    name: Discord Notification
+    needs: [deploy-dev, deploy-prod]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord Message
+        run: |
+          MESSAGE=""
+
+          # Check Dev Deploy Status
+          if [ "${{ needs.deploy-dev.result }}" != "" ]; then
+            STATUS_DEV="${{ needs.deploy-dev.outputs.status }}"
+            if [ "$STATUS_DEV" = "success" ]; then
+              MESSAGE="${MESSAGE}✅ \`[FE develop]\` 배포 완료\n"
+            elif [ "$STATUS_DEV" = "failure" ]; then
+              MESSAGE="${MESSAGE}🚨 \`[FE develop]\` 배포 실패\n"
+            fi
+          fi
+
+          # Check Prod Deploy Status
+          if [ "${{ needs.deploy-prod.result }}" != "" ]; then
+            STATUS_PROD="${{ needs.deploy-prod.outputs.status }}"
+            if [ "$STATUS_PROD" = "success" ]; then
+              MESSAGE="${MESSAGE}✅ \`[FE prod]\` 배포 완료 (Blue-Green)\n"
+            elif [ "$STATUS_PROD" = "failure" ]; then
+              MESSAGE="${MESSAGE}🚨 \`[FE prod]\` 배포 실패 (헬스체크 실패 등)\n"
+            fi
+          fi
+
+          if [ -z "$MESSAGE" ]; then
+            MESSAGE="⚠️ 배포 상태 정보를 찾을 수 없습니다."
           fi
 
           curl -H "Content-Type: application/json" \
