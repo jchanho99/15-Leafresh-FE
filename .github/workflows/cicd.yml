@@ -247,53 +247,38 @@ jobs:
             IMAGE="jchanho99/frontend-prod:${{ env.SHORT_SHA }}"
             HEALTH_CHECK_URL="http://localhost:3001" # 헬스 체크 URL
 
-            echo "🚀 Starting Prod Blue-Green Deployment to host: ${{ secrets.LEAFRESH_PROD_HOST }}"
-            echo "🖼️ Using image: $IMAGE"
+            echo "Using image: $IMAGE"
 
             cd /opt/frontend/
             echo "PWD: $(pwd)"
-
-            echo "🚚 Pulling Docker image: $IMAGE"
             sudo docker pull "$IMAGE"
 
             CURRENT=$(cat /opt/frontend-current 2>/dev/null || echo blue)
             NEXT=$([ "$CURRENT" = "blue" ] && echo green || echo blue)
 
-            echo "🔵 Current active environment: $CURRENT"
-            echo "🟢 Next environment to deploy: $NEXT"
+            echo "Current active environment: $CURRENT"
+            echo "Next environment to deploy: $NEXT"
             
-            # 참고: 아래 docker compose up -d 명령은 /opt/frontend/docker-compose.yml 파일을 사용합니다.
-            # 이 docker-compose.yml 파일이 $NEXT 환경 (예: frontend-green 서비스)을 
-            # 올바르게 시작하거나 업데이트하도록 구성되어 있어야 합니다.
-            # (예: docker-compose.yml 내부에 blue, green 서비스가 모두 정의되어 있거나, 
-            # 환경변수를 통해 타겟 서비스의 이미지가 동적으로 설정되는 등)
-            echo "🚀 Bringing up $NEXT environment (frontend-$NEXT)..."
-            # 만약 docker-compose.yml에서 $NEXT에 해당하는 특정 서비스를 지정해야 한다면,
-            # 예: sudo docker compose up -d service-$NEXT
-            # 현재는 전체 compose up을 수행합니다.
             sudo docker compose up -d # 이 명령이 frontend-$NEXT 컨테이너를 시작/업데이트해야 함
 
-            echo "🩺 Performing health check for $NEXT on $HEALTH_CHECK_URL..."
             HEALTH_CHECK_PASSED=false
             for i in {1..60}; do
-              # 포트 리스닝 확인 (nc 명령어가 서버에 설치되어 있어야 함)
               if nc -z localhost 3001 2>/dev/null; then
                 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HEALTH_CHECK_URL")
                 if [ "$HTTP_CODE" -eq 200 ]; then
-                  # 원본 스크립트의 <title> 태그 확인 로직
                   CONTENT_STATUS=$(curl -s "$HEALTH_CHECK_URL" | grep "<title>")
                   if [ ! -z "$CONTENT_STATUS" ]; then
-                    echo "✅ Health check passed for $NEXT on attempt $i (HTTP $HTTP_CODE with <title>)."
+                    echo "Health check passed for $NEXT on attempt $i (HTTP $HTTP_CODE with <title>)."
                     HEALTH_CHECK_PASSED=true
                     break
                   else
-                    echo "⏳ Waiting ($i)... Health check for $NEXT: HTTP $HTTP_CODE but <title> not found. Retrying..."
+                    echo "Waiting ($i)... Health check for $NEXT: HTTP $HTTP_CODE but <title> not found. Retrying..."
                   fi
                 else
-                  echo "⏳ Waiting ($i)... Health check for $NEXT: Failed with HTTP status $HTTP_CODE. Retrying..."
+                  echo "Waiting ($i)... Health check for $NEXT: Failed with HTTP status $HTTP_CODE. Retrying..."
                 fi
               else
-                echo "⏳ Waiting ($i)... Health check for $NEXT: Port 3001 not listening. Retrying..."
+                echo "Waiting ($i)... Health check for $NEXT: Port 3001 not listening. Retrying..."
               fi
               sleep 1
             done
@@ -307,10 +292,10 @@ jobs:
               exit 1
             fi
 
-            echo "✅ Health check successful for $NEXT environment."
-            echo "🔄 Switching traffic..."
+            echo "Health check successful for $NEXT environment."
+            echo "Switching traffic..."
 
-            echo "🛑 Stopping and removing $CURRENT environment (frontend-$CURRENT)..."
+            echo "Stopping and removing $CURRENT environment (frontend-$CURRENT)..."
             sudo docker stop "frontend-$CURRENT" || true
             sudo docker rm "frontend-$CURRENT" || true
             
@@ -319,14 +304,13 @@ jobs:
             # 특정 이유가 있을 수 있으므로 원본 로직을 유지합니다.
             # 일반적인 Blue/Green에서는 이 부분이 필요 없을 수 있습니다 (이미 $NEXT는 잘 실행 중).
             # 대신, 이 시점에서 리버스 프록시 설정을 변경하여 트래픽을 $NEXT로 전환합니다.
-            echo "⚠️ Force restarting $NEXT environment as per original script logic (stop, rm, up)..."
+            echo "Force restarting $NEXT environment as per original script logic (stop, rm, up)..."
             sudo docker stop "frontend-$NEXT" || true
             sudo docker rm "frontend-$NEXT" || true
             sudo docker compose up -d # $NEXT 환경을 다시 시작
             # --- 원본 스크립트 로직 끝 ---
 
             echo "$NEXT" > /opt/frontend-current
-            echo "🎉 Prod Blue-Green deployment to $NEXT complete. $NEXT is now active."
 
       - name: Set Status (Prod)
         id: set-status
