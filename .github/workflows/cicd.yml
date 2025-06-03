@@ -189,6 +189,7 @@ jobs:
           file: ./Dockerfile
           push: true
           tags: jchanho99/frontend-prod:${{ env.SHORT_SHA }}
+
   
   deploy-dev:
     name: Deploy to Dev Server
