@@ -174,7 +174,9 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: jchanho99/frontend-develop:${{ env.VERSION }}
+          tags: |
+            jchanho99/frontend-develop:${{ env.VERSION }}
+            jchanho99/frontend-develop:latest
 
   build-prod:
     name: Build and Push Docker (prod)
@@ -229,7 +231,7 @@ jobs:
             IMAGE="jchanho99/frontend-develop:${VERSION}"
             cd /opt/frontend/
             echo "PWD: $(pwd)"
-            sudo docker compose down
+            sudo docker stop backend-develop || true
             sudo docker rm frontend-develop || true # frontend-develop 컨테이너 삭제 (오류 무시)
             sudo docker pull "$IMAGE"
             sudo docker compose up -d
