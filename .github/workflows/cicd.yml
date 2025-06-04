@@ -220,10 +220,10 @@ jobs:
         id: deploy-step
         uses: appleboy/ssh-action@v1.0.3 # 특정 버전 사용 권장
         with:
-          host: ${{ secrets.LEAFRESH_DEV_HOST }}
-          username: ${{ secrets.LEAFRESH_DEV_SSH_USER }} # 개발 서버 SSH 사용자 이름 Secret
-          key: ${{ secrets.LEAFRESH_DEV_SSH }}
-          port: ${{ secrets.LEAFRESH_DEV_SSH_PORT || 22 }} # 개발 서버 SSH 포트 Secret (없으면 22)
+          host: ${{ secrets.SSH_HOST_DEV }}
+          username: ${{ secrets.SSH_USER_DEV }} # 개발 서버 SSH 사용자 이름 Secret
+          key: ${{ secrets.SSH_PRIVATE_KEY_DEV }}
+          port: ${{ secrets.SSH_PORT_DEV || 22 }} # 개발 서버 SSH 포트 Secret (없으면 22)
           script: |
             set -e
             IMAGE="jchanho99/frontend-develop:${VERSION}"
@@ -259,10 +259,10 @@ jobs:
         id: deploy-step
         uses: appleboy/ssh-action@v1.0.3 # 특정 버전 사용 권장
         with:
-          host: ${{ secrets.LEAFRESH_PROD_HOST }}
-          username: ${{ secrets.LEAFRESH_PROD_SSH_USER }} # 프로덕션 서버 SSH 사용자 이름 Secret
-          key: ${{ secrets.FE_SSH_PRIVATE_KEY }}
-          port: ${{ secrets.LEAFRESH_PROD_SSH_PORT || 22 }} # 프로덕션 서버 SSH 포트 Secret (없으면 22)
+          host: ${{ secrets.SSH_HOST_PROD }}
+          username: ${{ secrets.SSH_USER_PROD }} # 프로덕션 서버 SSH 사용자 이름 Secret
+          key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
+          port: ${{ secrets.SSH_PORT_PROD || 22 }} # 프로덕션 서버 SSH 포트 Secret (없으면 22)
           script: |
             set -e # 오류 발생 시 즉시 스크립트 중단
             IMAGE="jchanho99/frontend-prod:${{ env.VERSION }}"
