@@ -236,7 +236,11 @@ jobs:
             sudo docker stop frontend-develop || true
             sudo docker rm frontend-develop || true # frontend-develop 컨테이너 삭제 (오류 무시)
             sudo docker pull "$IMAGE"
-            sudo docker compose up -d
+            sudo docker run -d --name frontend-develop \
+              --env-file /home/ubuntu/app/.env \
+              -p 8080:8080 \
+              --restart always \
+              "$IAMGE"
             
       - name: Set Status (Dev)
         id: set-status
