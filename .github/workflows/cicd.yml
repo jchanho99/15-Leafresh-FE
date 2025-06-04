@@ -231,7 +231,7 @@ jobs:
             IMAGE="jchanho99/frontend-develop:${VERSION}"
             cd /opt/frontend/
             echo "PWD: $(pwd)"
-            sudo docker stop backend-develop || true
+            sudo docker stop frontend-develop || true
             sudo docker rm frontend-develop || true # frontend-develop 컨테이너 삭제 (오류 무시)
             sudo docker pull "$IMAGE"
             sudo docker compose up -d
