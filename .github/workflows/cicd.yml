@@ -228,6 +228,8 @@ jobs:
           port: ${{ secrets.SSH_PORT_DEV || 22 }} # 개발 서버 SSH 포트 Secret (없으면 22)
           script: |
             set -e
+            VERSION="${{ github.ref }}"             # ex: refs/tags/v2.0.6-dev
+            VERSION="${VERSION#refs/tags/}"         # remove prefix
             IMAGE="jchanho99/frontend-develop:${VERSION}"
             cd /opt/frontend/
             echo "PWD: $(pwd)"
@@ -267,6 +269,8 @@ jobs:
           port: ${{ secrets.SSH_PORT_PROD || 22 }} # 프로덕션 서버 SSH 포트 Secret (없으면 22)
           script: |
             set -e # 오류 발생 시 즉시 스크립트 중단
+            VERSION="${{ github.ref }}"             # ex: refs/tags/v2.0.6
+            VERSION="${VERSION#refs/tags/}"         # remove prefix
             IMAGE="jchanho99/frontend-prod:${{ env.VERSION }}"
             HEALTH_CHECK_URL="http://localhost:3001" # 헬스 체크 URL
 
