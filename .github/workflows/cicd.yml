@@ -74,7 +74,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 필요에 따라 여러 설정으로 확장 (예: 다른 브라우저)
         browser: [chromium]
     steps:
       - uses: actions/checkout@v3
