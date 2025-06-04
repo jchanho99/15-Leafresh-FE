@@ -9,6 +9,7 @@ on:
 jobs:
   setup:
     name: Setup and Install Dependencies
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     outputs:
       pnpm_cache_hit: ${{ steps.cache-pnpm.outputs.cache-hit }}
